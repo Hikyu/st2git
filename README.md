@@ -1,5 +1,7 @@
 # st2git 
 
+该工程是在 [git-starteam](https://github.com/planestraveler/git-starteam) 的基础上进行的修改。
+
 st2git 用于将 starteam 上面的项目转换为 git 项目。
 
 > 使用该程序之前需要在本机安装git。
