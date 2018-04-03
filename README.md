@@ -54,7 +54,23 @@ itself.
 
 ## 用法
 
-1. 修改配置文件 config.properties
+1. 安装jar包
+
+```
+mvn install:install-file -Dfile=<path-to-file> -DgroupId=<group-id> -DartifactId=<artifact-id> -Dversion=<version> -Dpackaging=<packaging>
+```
+
+安装 lib文件夹下的jar包到mvn仓库。
+
+2. 打包
+
+```
+mvn package
+```
+
+生成的可执行文件位于 target/output 目录下。
+
+3. 修改配置文件 config.properties
 
 ```sh
 // starteam 服务地址
@@ -90,10 +106,12 @@ excludedLabels=xxx;xxx;xxx
 
 ![图1 starteam上的项目](image/st-project.png)
 
-2. 启动转换程序
+4. 启动转换程序
 
-双击 `run.bat` 脚本，启动程序。
+由于 starteam SDK 需要 32位的jre，故在需要指定32位jre的路径。
 
-由于 starteam SDK 需要 32位的jre，故在脚本中指定了32位jre的路径。
+```
+jre\bin\java.exe -jar st2git.jar
+```
 
 st-git.log 是转换过程中生成的日志，其中 `Skiped View` 下输出的内容即被忽略或跳过的视图名。
