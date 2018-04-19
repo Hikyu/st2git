@@ -802,8 +802,8 @@ public class GitImporter {
 			View vc;
 			if(lastTime - timeIncrement.getTimeInMillis() <= day) {
 				vc = view;
-			} else {
 				vc = new View(view, ViewConfiguration.createFromTime(new OLEDate(timeIncrement.getTimeInMillis())));
+			} else {
 			}
 			Log.log("View Configuration Time: " + timeIncrement.getTime());
 			generateFastImportStream(vc, baseFolder);
@@ -887,7 +887,15 @@ public class GitImporter {
 			generateFastImportStream(vc, baseFolder);
 			vc.close();
 			
-			if (lastTime - timeIncrement.getTimeInMillis() > 7*day) {
+			if (lastTime - timeIncrement.getTimeInMillis() > 180*day) {
+                // 最近的修改距离上一次提交大于180天，生成上一次提交到180天之后的commits
+                timeIncrement.add(Calendar.DAY_OF_YEAR, 180);
+            }
+			else if (lastTime - timeIncrement.getTimeInMillis() > 30*day) {
+                // 最近的修改距离上一次提交大于30天，生成上一次提交到30天之后的commits
+                timeIncrement.add(Calendar.DAY_OF_YEAR, 30);
+            }
+			else if (lastTime - timeIncrement.getTimeInMillis() > 7*day) {
 			    // 最近的修改距离上一次提交大于七天，生成上一次提交到7天之后的commits
 				timeIncrement.add(Calendar.DAY_OF_YEAR, 7);
 			}
@@ -950,7 +958,7 @@ public class GitImporter {
 					continue;
 				}
 				if (!excludedViewSet.contains(view.getName())) {
-					views.add(view);
+				        views.add(view);
 				}
 			} catch (Exception e) {
 				Log.log("Skipping view " + viewName + ": " + e);
@@ -997,7 +1005,7 @@ public class GitImporter {
 				setFolder(baseView, baseFolder);
 				CommitPopulationStrategy baseStrategy = new BasePopulationStrategy(baseView);
 				setCheckoutStrategy(baseStrategy);
-				baseStrategy.filePopulation(alternateHead, folder);
+				baseStrategy.filePopulation(alternateHead, folder);// 先把分叉点的文件提交信息计算好
 				lastFiles.addAll(baseStrategy.getLastFiles());
 				startDate = new java.util.Date(baseStrategy.getListOfCommit().lastKey().getTime());
 				baseView.close();
