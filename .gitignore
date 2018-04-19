@@ -1,3 +1,5 @@
 .settings/
 target/
 netmon.out
+st-git.log
+.classpath
