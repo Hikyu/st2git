@@ -223,6 +223,7 @@ public class GitImporter {
 			CommitInformation current = e.getKey();
 			String userName = "";
 			String userEmail = "";
+			dontTryServerAdministrationAgain = true;// 直接使用指定的后缀名
 			if (!dontTryServerAdministrationAgain) {
 				try {
 					UserAccount userAccount = server.getAdministration().findUserAccount(current.getUid());
@@ -799,7 +800,7 @@ public class GitImporter {
 		Calendar timeIncrement = Calendar.getInstance();
 		timeIncrement.setTimeInMillis(firstTime);
 		while (timeIncrement.getTimeInMillis() <= lastTime) {
-			View vc;
+			View vc = null;
 			if(lastTime - timeIncrement.getTimeInMillis() <= day) {
 				vc = view;
 				vc = new View(view, ViewConfiguration.createFromTime(new OLEDate(timeIncrement.getTimeInMillis())));
