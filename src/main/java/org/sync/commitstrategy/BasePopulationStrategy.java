@@ -201,7 +201,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 		Integer previousVersion = -1;
 		Integer previousContentVersion = -1;
 		if (null == fileid) {
-			helper.registerFileId(head, path, historyFile.getItemID(), initialFileVersion, historyFile.getMD5());
+			helper.registerFileId(head, path, historyFile.getItemID(), initialFileVersion, historyFile.getContentVersion(), historyFile.getMD5());
 		} else {
 			// fetch the previous version we did register so we continue
 			// modification from that point in time.

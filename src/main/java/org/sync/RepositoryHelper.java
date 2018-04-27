@@ -99,7 +99,7 @@ public abstract class RepositoryHelper {
 	 * 
 	 * @return true if the file was correctly registered. False otherwise.
 	 */
-	public boolean registerFileId(String head, String filename, int fileId, int fileVersion, byte[] md5) {
+	public boolean registerFileId(String head, String filename, int fileId, int fileVersion, int contentVersion, byte[] md5) {
 		if(null == fileInformation) {
 			if(!loadFileInformation()) {
 				fileInformation = new HashMap<String, Map<String, StarteamFileInfo>>();
@@ -109,7 +109,7 @@ public abstract class RepositoryHelper {
 			fileInformation.put(head, new HashMap<String, StarteamFileInfo>());
 		}
 		if(!fileInformation.get(head).containsKey(filename)) {
-			fileInformation.get(head).put(filename, new StarteamFileInfo(filename, fileId, fileVersion, fileVersion, md5));
+			fileInformation.get(head).put(filename, new StarteamFileInfo(filename, fileId, fileVersion, contentVersion, md5));
 			return true;
 		}
 		return false;
