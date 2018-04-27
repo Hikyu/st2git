@@ -145,19 +145,20 @@ public final class CommitInformation implements Comparable<CommitInformation> {
 	@Override
 	public int compareTo(CommitInformation o) {
 		if(getCommitDate().equals(o.getCommitDate())) {
-			if(uid == o.uid) {
-				if(comment.length() == 0) {
-					return path.compareTo(o.getPath());
-				} else if (o.comment.length() == 0) {
-					return path.compareTo(o.getPath());
-				} else if (comment.equalsIgnoreCase(o.comment)) {
-					return path.compareTo(o.getPath());
-				}
-				return comment.compareTo(o.comment);
-			} else if (uid > o.uid) {
-				return 1;
-			}
-			return -1;
+//			if(uid == o.uid) {
+//				if(comment.length() == 0 || o.comment.length() == 0 || comment.equalsIgnoreCase(o.comment)) {
+//					return path.compareTo(o.getPath());
+//				}
+//				return comment.compareTo(o.comment);
+//			} else if (uid > o.uid) {
+//				return 1;
+//			}
+//			return -1;
+		    if (getAuthorDate().after(o.getAuthorDate())) {
+                return 1;
+            } else {
+                return -1;
+            }
 		} else if (getCommitDate().after(o.getCommitDate())) {
 			return 1;
 		}
