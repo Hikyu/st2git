@@ -52,6 +52,18 @@ file4.c: user1  3:53pm  <empty log message>
 file1.c 和 file2.c 将被纳入同一个 git commit，file3.c 将被纳入一个git commit， file4.c 将被纳入一个git commit
 itself. 
 
+## 缺陷
+
+由于程序计算提交算法的特性和starteam的某些特性，生成的git项目可能会有一些缺陷：
+
+1. 存在某些提交跨越多个label重复出现的情况；
+
+2. 存在某些提交 authored date 错乱的情况；
+
+3. 存在不同的文件的revision应该计算为一个提交却被分散为多个提交的情况。
+
+上述情况目前没有好的解决办法，但不会影响生成的各个版本的正确性。
+ 
 ## 用法
 
 1. 安装jar包
@@ -81,6 +93,8 @@ email=db.org
 
 // 以上三项使用默认项即可
 
+// 模式，st2git则开启导入，否则进入验证模式
+mode=st2git
 // 项目名称，见图1
 project=oscartools
 // 视图名称，即进入项目后的任意视图
@@ -102,6 +116,8 @@ verify=true
 skipViewsPattern=
 // 需要跳过的 label
 excludedLabels=xxx;xxx;xxx
+// 选择需要导入的视图名称，为空则默认全部导入
+includeViews=xxx;xxx;xxx
 ```
 
 ![图1 starteam上的项目](image/st-project.png)
