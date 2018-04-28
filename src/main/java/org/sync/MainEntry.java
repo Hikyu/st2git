@@ -160,6 +160,9 @@ public class MainEntry {
 		if (workingFolder == null) {
             workingFolder = Config.instance.get("workfolder");
         }
+		
+		boolean st2git = Config.instance.get("mode","st2git").equalsIgnoreCase("st2git");
+		
 		Boolean verboseFlag = (Boolean) parser.getOptionValue(isVerbose);
 		boolean verbose = verboseFlag != null && verboseFlag;
 		Boolean checkpointFlag = (Boolean) parser.getOptionValue(isCheckpoint);
@@ -350,35 +353,42 @@ public class MainEntry {
 								if(v.getName().equalsIgnoreCase(view)) {
 									viewFound = true;
 									rootView = v;
-									if(allViews) {
-									    // modify 检测这个视图是否是空的文件夹
-									    Folder rootFolder = v.getRootFolder();
-                                        Item[] items = rootFolder.getItems(rootFolder.getTypeNames().FILE);
-                                        if (items == null || items.length == 0) {
-                                            System.err.println(v.getName() + " is a empty view!");
-                                            break;
-                                        }
-                                        // modify end
-										importer.generateAllViewsImport(p, v, folder, skipViewsPattern);
-										importComplete = true;
-									} else if(null != timeBased && timeBased) {
-										importer.setCheckoutStrategy(new BasePopulationStrategy(v));
-										importer.generateDayByDayImport(v, date, folder);
-									} else if (null != labelBased && labelBased) {
-										if (changeRequestFilePattern != null) {
-											importer.setCheckoutStrategy(new ChangeRequestPopulationStrategy(v, changeRequestFilePattern));
-										} else {
-											importer.setCheckoutStrategy(new BasePopulationStrategy(v));
-										}
-										importer.generateByLabelImport(v, date, folder, viewLabelPattern, changeRequestFilePattern);
-									} else if(revisionLabelBased != null && revisionLabelBased){
-										importer.setCheckoutStrategy(new RevisionPopulationStrategy(v));
-										importer.generateByRevisionLabelImport(v, date, folder, revisionLabelPattern);
-									} else {
-										importer.setCheckoutStrategy(new BasePopulationStrategy(v));
-										importer.generateFastImportStream(v, folder);
-									}
-									break;
+									if (st2git) {
+                                        if (allViews) {
+                                            // modify 检测这个视图是否是空的文件夹
+                                            Folder rootFolder = v.getRootFolder();
+                                            Item[] items = rootFolder.getItems(rootFolder.getTypeNames().FILE);
+                                            if (items == null || items.length == 0) {
+                                                System.err.println(v.getName() + " is a empty view!");
+                                                break;
+                                            }
+                                            // modify end
+                                            importer.generateAllViewsImport(p, v, folder, skipViewsPattern);
+                                            importComplete = true;
+                                        } else if (null != timeBased && timeBased) {
+                                            importer.setCheckoutStrategy(new BasePopulationStrategy(v));
+                                            importer.generateDayByDayImport(v, date, folder);
+                                        } else if (null != labelBased && labelBased) {
+                                            if (changeRequestFilePattern != null) {
+                                                importer.setCheckoutStrategy(new ChangeRequestPopulationStrategy(v,
+                                                        changeRequestFilePattern));
+                                            } else {
+                                                importer.setCheckoutStrategy(new BasePopulationStrategy(v));
+                                            }
+                                            importer.generateByLabelImport(v, date, folder, viewLabelPattern,
+                                                    changeRequestFilePattern);
+                                        } else if (revisionLabelBased != null && revisionLabelBased) {
+                                            importer.setCheckoutStrategy(new RevisionPopulationStrategy(v));
+                                            importer.generateByRevisionLabelImport(v, date, folder,
+                                                    revisionLabelPattern);
+                                        } else {
+                                            importer.setCheckoutStrategy(new BasePopulationStrategy(v));
+                                            importer.generateFastImportStream(v, folder);
+                                        } 
+                                    } else {
+                                        verify(rootView, importer);
+                                    }
+                                    break;
 								} else if(verbose) {
 									System.err.println("Not view: " + v.getName());
 								}
@@ -390,19 +400,14 @@ public class MainEntry {
 						
 					} finally {
 						importer.dispose();
-						if (importComplete) {
+						if (st2git && importComplete) {
 						    importer.resetHEAD(rootView.getName());
 						    importEnd(importer.getImportedViews(), importer.getSkipViews());
 						    if (Boolean.valueOf(Config.instance.get("verify", "false"))) {
-						        try {
-						            Verify verify = new Verify(importer.getWorkingDirectory(), rootView);
-						            verify.verify();
-						        } catch (IOException e) {
-						            e.printStackTrace();
-						        }
+						        verify(rootView, importer);
 						    }
-						    Log.close();
                         }
+						Log.close();
 					}
 					break;
 				} else if(verbose) {
@@ -417,6 +422,15 @@ public class MainEntry {
 			System.err.println("Could not log in user: " + user);
 		}
 	}
+
+    private static void verify(View rootView, GitImporter importer) {
+        try {
+            Verify verify = new Verify(importer.getWorkingDirectory(), rootView);
+            verify.verify();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 	
 	private static void importEnd(Map<String, String> importedViews, Set<String> skipViews) {
 	    Log.log(">>>>>>>>>>>>>>>>>>>>>>>Import End>>>>>>>>>>>>>>>>>>>>>>>>>");
