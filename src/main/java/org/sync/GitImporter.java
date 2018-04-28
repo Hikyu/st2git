@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
-import java.util.Vector;
 import java.util.regex.Pattern;
 
 import org.eclipse.jgit.api.Git;
@@ -108,7 +107,7 @@ public class GitImporter {
 
 	private Set<String> excludedLabelSet = new HashSet<String>();
 	
-	private Set<String> excludedViewSet = new HashSet<String>();
+	private Set<String> includeViewSet = new HashSet<String>();
 
 	public GitImporter(Server s, Project p) {
 		server = s;
@@ -936,10 +935,8 @@ public class GitImporter {
 		while(!deque.isEmpty()) {
 			View view = deque.removeFirst();
 			try {
-				if (!excludedViewSet.contains(view.getName())) {//如果视图是衍生出来的视图，那么主视图忽略导入，衍生视图也会忽略
-					for (View derivedView: view.getDerivedViews()) {
-						deque.addLast(derivedView);
-					}
+				for (View derivedView: view.getDerivedViews()) {
+					deque.addLast(derivedView);
 				}
 			} catch (RuntimeException e) {
 				Log.log("Could not get derived views for " + view.getName() + ": " + e);
@@ -958,9 +955,9 @@ public class GitImporter {
 					skipView.add(view.getName());
 					continue;
 				}
-				if (!excludedViewSet.contains(view.getName())) {
-				        views.add(view);
-				}
+				if (includeViewSet.isEmpty() || includeViewSet.contains(view.getName())) {
+				    views.add(view);
+                }
 			} catch (Exception e) {
 				Log.log("Skipping view " + viewName + ": " + e);
 			}
@@ -1258,6 +1255,12 @@ public class GitImporter {
 		}
 	}
 	
+	public void setViewInclusion(List<String> includeViews) {
+	    for (String view : includeViews) {
+            includeViewSet.add(view);
+        }
+	}
+	
 	/**
 	 * Set the option to keep the OEL settings from StarTeam to Git (via the .gitattributes).
 	 * @param EOLAttribute true to keep the OEL property
@@ -1265,18 +1268,6 @@ public class GitImporter {
 	 */
 	public void setEOLAttribute(boolean EOLAttribute){
 		this.setEOLAttribute = EOLAttribute;
-	}
-	/**
-	 * 设置忽略导入的一组视图名
-	 * @param excludedViewSet
-	 */
-	public void setViewExclusion(Vector<String> excludedViews) {
-		for (Object o : excludedViews) {
-			String label = o.toString();
-			if (!excludedViewSet.contains(label)) {
-				excludedViewSet.add(label);
-			}
-		}
 	}
 	
 	public Map<String, String> getImportedViews() {

@@ -23,6 +23,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -179,15 +180,15 @@ public class MainEntry {
 		if (excludedLabels == null || excludedLabels.size() == 0) {
 		    String labels = Config.instance.get("excludedLabels");
 		    if (labels != null) {
-		        String[] filterLabels = labels.split(";");
-		        excludedLabels = new Vector<String>();
-		        for (String label : filterLabels) {
-		            excludedLabels.add(label);
-		        }
+		        excludedLabels = new Vector<>(Arrays.asList(labels.split(";")));
             }
         }
-		@SuppressWarnings("unchecked")
-		Vector<String> excludedViews = parser.getOptionValues(excludeView);
+		
+		List<String> includeViews = new ArrayList<>();
+		if (!"".equals(Config.instance.get("includeViews",""))) {
+            includeViews = Arrays.asList(Config.instance.get("includeViews","").split(";"));
+        }
+		
 //		if(host == null || port == null || project == null || (view == null && !allViews)) {
 		if(host == null || port == null || project == null || (view == null)) {
 			printHelp();
@@ -342,7 +343,7 @@ public class MainEntry {
 						importer.setLFSPattern(lfsRegexPattern);
 						importer.setLabelExclusion(excludedLabels);
 						importer.setEOLAttribute(eolAttribute);
-						importer.setViewExclusion(excludedViews);
+						importer.setViewInclusion(includeViews);
 						NetMonitor.onFile(new java.io.File("netmon.out"));
 
 						if(allViews && view == null) {
