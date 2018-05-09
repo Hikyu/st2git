@@ -359,7 +359,7 @@ public class MainEntry {
                                             // modify 检测这个视图是否是空的文件夹
                                             Folder rootFolder = v.getRootFolder();
                                             Item[] items = rootFolder.getItems(rootFolder.getTypeNames().FILE);
-                                            if (items == null || items.length == 0) {
+                                            if ((items == null || items.length == 0) && (rootFolder.getSubFolderCount() == 0)) {
                                                 System.err.println(v.getName() + " is a empty view!");
                                                 break;
                                             }
