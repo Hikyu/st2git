@@ -54,6 +54,25 @@
 			<artifactId>st2git_jars</artifactId>
 			<version>1.0.0</version>
 		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/com.squareup.okhttp/okhttp -->
+		<dependency>
+			<groupId>com.squareup.okhttp</groupId>
+			<artifactId>okhttp</artifactId>
+			<version>2.7.5</version>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/net.sf.json-lib/json-lib -->
+		<dependency>
+			<groupId>net.sf.json-lib</groupId>
+			<artifactId>json-lib</artifactId>
+			<version>2.4</version>
+			<classifier>jdk15</classifier>
+		</dependency>
+
+
+
+
 	</dependencies>
 	<build>
 		<plugins>
@@ -103,6 +122,7 @@
 									<filtering>true</filtering>
 									<includes>
 										<include>config.properties</include>
+										<include>td-req.csv</include>
 									</includes>
 								</resource>
 							</resources>

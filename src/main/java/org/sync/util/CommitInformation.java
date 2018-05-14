@@ -32,6 +32,7 @@ public final class CommitInformation implements Comparable<CommitInformation> {
 	private String comment;
 	private String path;
 	private boolean fileDelete;
+	private String uname;
 
 	@Deprecated
 	public CommitInformation(long time, int uid, String comment, String path) {
@@ -75,7 +76,15 @@ public final class CommitInformation implements Comparable<CommitInformation> {
 		return uid;
 	}
 	
-	public String getPath() {
+	public String getUname() {
+        return uname;
+    }
+
+    public void setUname(String uname) {
+        this.uname = uname;
+    }
+
+    public String getPath() {
 		return path;
 	}
 	

@@ -40,6 +40,7 @@ import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.util.StringUtils;
 import org.ossnoize.git.fastimport.Blob;
 import org.ossnoize.git.fastimport.Commit;
 import org.ossnoize.git.fastimport.Data;
@@ -222,31 +223,38 @@ public class GitImporter {
 			CommitInformation current = e.getKey();
 			String userName = "";
 			String userEmail = "";
-			dontTryServerAdministrationAgain = true;// 直接使用指定的后缀名
-			if (!dontTryServerAdministrationAgain) {
-				try {
-					UserAccount userAccount = server.getAdministration().findUserAccount(current.getUid());
-					if (userAccount != null) { // It is sometime possible that the user account would be null
-						userName = userAccount.getName();
-						userEmail = userAccount.getEmailAddress();
-					} else {
-						User fallback = server.getUser(current.getUid());
-						userName = fallback.getName();
-						userEmail = userMapping.getEmail(userName);
-					}
-				} catch (ServerException ex) {
-					Log.log("Could not retrieve user from Administration Server. You probably do not have the right.");
-					Log.log("Will use a Name.Surname@domain strategy to guess the e-mail address");
-					dontTryServerAdministrationAgain = true;
-				}
-			}
-			if (dontTryServerAdministrationAgain) {
-				User userAccount = server.getUser(current.getUid());
-				userName = userAccount.getName();
-				userEmail = userMapping.getEmail(userName);
-			}
+			// 直接使用指定的后缀名
+//			dontTryServerAdministrationAgain = true;// 直接使用指定的后缀名
+//			if (!dontTryServerAdministrationAgain) {
+//				try {
+//					UserAccount userAccount = server.getAdministration().findUserAccount(current.getUid());
+//					if (userAccount != null) { // It is sometime possible that the user account would be null
+//						userName = userAccount.getName();
+//						userEmail = userAccount.getEmailAddress();
+//					} else {
+//						User fallback = server.getUser(current.getUid());
+//						userName = fallback.getName();
+//						userEmail = userMapping.getEmail(userName);
+//					}
+//				} catch (ServerException ex) {
+//					Log.log("Could not retrieve user from Administration Server. You probably do not have the right.");
+//					Log.log("Will use a Name.Surname@domain strategy to guess the e-mail address");
+//					dontTryServerAdministrationAgain = true;
+//				}
+//			}
+//			if (dontTryServerAdministrationAgain) {
+//				User userAccount = server.getUser(current.getUid());
+//				userName = userAccount.getName();
+//				userEmail = userMapping.getEmail(userName);
+//			}
+			userName = current.getUname();
+			if (StringUtils.isEmptyOrNull(userName)) {
+			    User userAccount = server.getUser(current.getUid());
+			    userName = userAccount.getName();
+            }
+			userEmail = userMapping.getEmail(userName);
+            
 			String path = current.getPath();
-
 			try {
 				FileOperation fo;
 				if(current.isFileDelete()) {

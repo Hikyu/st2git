@@ -16,6 +16,7 @@
  ******************************************************************************/
 package org.sync.commitstrategy;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -27,15 +28,34 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import com.starbase.starteam.*;
+import org.eclipse.jgit.util.StringUtils;
 import org.sync.CommitPopulationStrategy;
 import org.sync.Log;
 import org.sync.RenameFinder;
 import org.sync.RepositoryHelper;
 import org.sync.util.CommitInformation;
 import org.sync.util.Config;
+import org.sync.util.HttpClient;
 import org.sync.util.Pair;
+
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
+import com.starbase.starteam.File;
+import com.starbase.starteam.Folder;
+import com.starbase.starteam.Item;
+import com.starbase.starteam.ItemList;
+import com.starbase.starteam.Label;
+import com.starbase.starteam.PropertyNames;
+import com.starbase.starteam.RecycleBin;
+import com.starbase.starteam.ServerException;
+import com.starbase.starteam.Type;
+import com.starbase.starteam.View;
+
+import jdk.nashorn.internal.parser.JSONParser;
+import net.sf.json.JSONObject;
 
 public class BasePopulationStrategy implements CommitPopulationStrategy {
 
@@ -542,26 +562,207 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 	 */
 	protected void createCommitInformation(String path, File fileToCommit, int iterationCounter) {
 		String comment = correctedComment(fileToCommit);
-		// This is a patchup time to prevent commit jumping up in time between view labels
+		String realAuthor = getRealAuthor(comment);
+		String commentWithFormatBugId = getCommentWithFormatBugId(comment);
+		String realComment = getRealComment(commentWithFormatBugId);
 		Date authorDate = new java.util.Date(fileToCommit.getModifiedTime().getLongValue());
-		long timeOfCommit = authorDate.getTime();
-		if (earliestTime != null && earliestTime.getTime() >= timeOfCommit) {
-			// add offset with last commit to keep order. Based on the last commit
-			// from the previous pass + 1 second by counter
-			long newTime = earliestTime.getTime() + (1000 * iterationCounter);
-			if (verbose) {
-				Log.logf("Changing commit time of %s from %d to %d", path, timeOfCommit, newTime);
-			}
-			timeOfCommit = newTime;
-		}
-		Date commitDate = new java.util.Date(timeOfCommit);
+		Date commitDate = calculateCommitDate(authorDate, iterationCounter);
 
-		CommitInformation info = new CommitInformation(commitDate, fileToCommit.getModifiedBy(), comment, path);
+		CommitInformation info = new CommitInformation(commitDate, fileToCommit.getModifiedBy(), realComment, path);
 		info.setAuthorDate(authorDate);
+		info.setUname(realAuthor);
 		if (verbose) {
 			Log.log("Discovered commit <" + info + ">");
 		}
 		currentCommitList.put(info, fileToCommit);
+	}
+	
+	/**
+	 * 将注释中的 bug id 替换为 gitlab 可识别的 bug id
+	 * 
+	 * 比如：To fix TD bug21581_bug123545_YF-20180909-001 by yukai : 将oscarJDBC.jar打包进其他jar包执行时，抛出未捕获异常
+     *      Review Link : http://192.168.101.27/r/8199/
+     *      
+     * 替换后：To fix TD bug #21581 bug #12345 req #30768(YF-20180909-001) by yukai : 将oscarJDBC.jar打包进其他jar包执行时，抛出未捕获异常
+     *      Review Link : http://192.168.101.27/r/8199/
+     * 
+	 * @param comment
+	 * @return
+	 */
+	private static String getCommentWithFormatBugId(String comment) {
+	    String commentWithFormatBugId = comment;
+        // 匹配 bugXXX BugXXX BUGXXX
+        commentWithFormatBugId = recursiveCheckBugTag(commentWithFormatBugId);
+        commentWithFormatBugId = recursiveCheckReqTag(commentWithFormatBugId);
+        // 将连续的bugID之间的"_"替换为" "
+        String pattern = "To\\s+fix\\s+.+by\\s+\\w+";
+        Matcher matcher = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(commentWithFormatBugId);
+        if (matcher.find()) {
+            String reviewTag = matcher.group(0);
+            // 去掉 "TD"
+            Matcher tdMatcher = Pattern.compile("TD\\s+", Pattern.CASE_INSENSITIVE).matcher(reviewTag);
+            if (tdMatcher.find()) {
+                reviewTag = tdMatcher.replaceFirst("");
+            }
+            // 去掉 by XXX
+            Matcher byMatcher = Pattern.compile("\\s+by\\s+\\w+", Pattern.CASE_INSENSITIVE).matcher(reviewTag);
+            if (byMatcher.find()) {
+                reviewTag = byMatcher.replaceFirst("");
+            }
+            commentWithFormatBugId = matcher.replaceFirst(Matcher.quoteReplacement(reviewTag.replaceAll("_", " ")));
+        }
+        return commentWithFormatBugId;
+	}
+	
+	private static String recursiveCheckReqTag(String comment) {
+	    String pattern = "[A-Z]{2}-\\d{8}-\\d{3}";
+        Matcher matcher = Pattern.compile(pattern).matcher(comment);
+        if (matcher.find()) {
+             String reqTag = matcher.group(0);
+             String formatComment = matcher.replaceFirst(Matcher.quoteReplacement(getFormatReqId(reqTag)));
+             return recursiveCheckReqTag(formatComment);
+        } else {
+            return comment;
+        }
+	}
+	
+	private static String recursiveCheckBugTag(String comment) {
+	    String pattern = "(bug|td)\\s*\\d+((\\s+|_|(\\s*(&|、|和|,|，)\\s*))\\d+)*";
+        Matcher matcher = Pattern.compile(pattern,Pattern.CASE_INSENSITIVE).matcher(comment);
+        if (matcher.find()) {
+             String bugTag = matcher.group(0);
+             String formatComment = matcher.replaceFirst(Matcher.quoteReplacement(getFormatBugId(bugTag)));
+             return recursiveCheckBugTag(formatComment);
+        } else {
+            return comment;
+        }
+	}
+	
+	private static String getFormatReqId(String reqName) {
+	    StringBuilder sBuilder = new StringBuilder("req");
+	    List<String> seqList = Config.instance.getReqSeqbyReqName(reqName);
+	    if (seqList.isEmpty()) {
+	        reqName = reqName.replaceAll("-", "--");// 防止无限递归
+	        return reqName ;
+        } else {
+            for (int i = 0; i < seqList.size(); ++i) {
+                int reqNumber = Config.instance.getTdReqStartNumber() + Integer.valueOf(seqList.get(i));
+                sBuilder.append("#").append(String.valueOf(reqNumber));
+                if (i < seqList.size() - 1) {
+                    sBuilder.append("|");
+                }
+            }
+//            sBuilder.append("(").append(reqName).append(")");
+            return sBuilder.toString();
+        }
+	}
+	
+	private static String getFormatBugId(String bugId) {
+	    StringBuilder sBuilder = new StringBuilder("bug");
+	    String pattern = "\\d+";
+	    Matcher matcher = Pattern.compile(pattern).matcher(bugId);
+        while (matcher.find()) {
+             sBuilder.append("#");
+             String bug = matcher.group();
+             sBuilder.append(bug).append(" ");
+        } 
+        return sBuilder.toString();
+	}
+	
+	/**
+     * 从注释中识别出完整的注释信息
+     * 
+     * 比如：To fix TD bug21581 by yukai : 将oscarJDBC.jar打包进其他jar包执行时，抛出未捕获异常
+     *      Review Link : http://192.168.101.27/r/8199/
+     *      
+     * 完整的注释信息在 Review Link : http://192.168.101.27/r/8199/ 页面当中，将这部分注释也添加进来。完整注释如下：
+     * 
+     * To fix TD bug21581 by yukai : 将oscarJDBC.jar打包进其他jar包执行时，抛出未捕获异常
+     * 将oscarJDBC.jar打包进其他jar包执行时，抛出未捕获异常
+     * Config.init 方法中读取了jar包或class所在的路径。当oscarJDBC.jar被打包进其他jar包执行时，无法访问该路径导致抛出异常。
+     * 此异常应该被捕获并忽略。
+     * 
+     * 
+     * review board API : http://192.168.101.27/api/review-requests/{review id} 取得xml格式的review详细信息
+     * 
+     * @return
+     */
+	private static String getRealComment(String comment) {
+	    StringBuilder realComment = new StringBuilder(comment);
+	    String pattern = "(Review\\s+)*(Link\\s+:\\s+)*[hH][tT]{2}[pP]://192.168.101.27/([A-Za-z0-9-~\\/])+";
+        Matcher matcher = Pattern.compile(pattern,Pattern.CASE_INSENSITIVE).matcher(comment);
+        String reviewLink = "";
+        while (matcher.find()) {
+            reviewLink = matcher.group();
+        }
+        if (!"".equals(reviewLink)) {
+            Matcher seqMatcher = Pattern.compile("\\d+").matcher(reviewLink);
+            String seq = "";
+            while(seqMatcher.find()) {// 找到需求编号
+                seq = seqMatcher.group();
+            }
+            if (!"".equals(seq)) {
+                String reviewBoardAPI = Config.instance.getReviewBoardRestDomain() + seq;
+                try {
+                    String res = HttpClient.httpRequest(reviewBoardAPI);
+                    JSONObject resObj = JSONObject.fromObject(res);
+                    JSONObject reviewRequest = JSONObject.fromObject(resObj.getString("review_request"));
+                    String description = reviewRequest.getString("description");
+                    // 换行并插入空行
+                    realComment.append("\n").append("\n").append(description);
+                } catch (IOException e) {
+                    Log.log("connect review board failed " + e.getMessage());
+                }
+            }
+           
+        }
+        return realComment.toString();
+	    
+	}
+	
+	
+	/**
+	 * 从注释中识别出真正的提交者
+	 * 
+	 * 比如：To fix TD bug21581 by yukai : 将oscarJDBC.jar打包进其他jar包执行时，抛出未捕获异常
+     *      Review Link : http://192.168.101.27/r/8199/
+     *      
+     * 真正的提交者为 yukai
+     * 
+	 * @return
+	 */
+	private static String getRealAuthor(String comment) {
+	    String realUser = null;
+	    String pattern = "To\\s+fix\\s+.+by\\s+\\w+";
+	    Matcher matcher = Pattern.compile(pattern).matcher(comment);
+	    if (matcher.find()) {
+            String reviewTag = matcher.group(0);
+            realUser = reviewTag.substring(reviewTag.lastIndexOf(" ")).trim();
+        }
+        return realUser;
+	}
+	
+	/**
+	 * 对于同一文件，保证提交时间是线性增长的，防止提交在view label之间错乱。
+	 * 
+	 * @param authorDate
+	 * @param iterationCounter
+	 * @return
+	 */
+	private Date calculateCommitDate(Date authorDate, int iterationCounter) {
+	    // This is a patchup time to prevent commit jumping up in time between view labels
+	    long timeOfCommit = authorDate.getTime();
+        if (earliestTime != null && earliestTime.getTime() >= timeOfCommit) {
+            // add offset with last commit to keep order. Based on the last commit
+            // from the previous pass + 1 second by counter
+            long newTime = earliestTime.getTime() + (1000 * iterationCounter);
+//            if (verbose) {
+//                Log.logf("Changing commit time of %s from %d to %d", path, timeOfCommit, newTime);
+//            }
+            timeOfCommit = newTime;
+        }
+        Date commitDate = new java.util.Date(timeOfCommit);
+        return commitDate;
 	}
 	
 	@Override
@@ -614,4 +815,14 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 		// Tag are always welcome with the base strategy
 		return true;
 	}
+	
+	public static void main(String[] args) {
+	    String comment = "bug td#19262 19291、14567&88888和939393，2231,33333 To fix td td19262_19291 by yangyancheng : 移植 from 7.0.7 to 7.0.8:调用包中函数时，结果出错"
+    + " 原评审地址:http://192.168.101.27/r/6510";
+        String realAuthor = getRealAuthor(comment);
+        String commentWithFormatBugId = getCommentWithFormatBugId(comment);
+        String realComment = getRealComment(commentWithFormatBugId);
+        System.out.println(realAuthor);
+        System.out.println(realComment);
+    }
 }
