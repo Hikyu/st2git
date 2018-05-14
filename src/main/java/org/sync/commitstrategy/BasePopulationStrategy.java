@@ -689,7 +689,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
      */
 	private static String getRealComment(String comment) {
 	    StringBuilder realComment = new StringBuilder(comment);
-	    String pattern = "(Review\\s+)*(Link\\s+:\\s+)*[hH][tT]{2}[pP]://192.168.101.27/([A-Za-z0-9-~\\/])+";
+	    String pattern = "(Review\\s+)*(Link\\s+:\\s+)*[hH][tT]{2}[pP]://(192.168.101.27)|(10.0.5.169)/([A-Za-z0-9-~\\/])+";
         Matcher matcher = Pattern.compile(pattern,Pattern.CASE_INSENSITIVE).matcher(comment);
         String reviewLink = "";
         while (matcher.find()) {
@@ -716,7 +716,12 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
             }
            
         }
-        return realComment.toString();
+        
+        // 将 reviewboard 连接替换为域名
+        String result = realComment.toString();
+        result = result.replaceAll("(192.168.101.27)|(10.0.5.169)", "reviewboard.db.org");
+        
+        return result;
 	    
 	}
 	
@@ -817,8 +822,9 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 	}
 	
 	public static void main(String[] args) {
-	    String comment = "bug td#19262 19291、14567&88888和939393，2231,33333 To fix td td19262_19291 by yangyancheng : 移植 from 7.0.7 to 7.0.8:调用包中函数时，结果出错"
-    + " 原评审地址:http://192.168.101.27/r/6510";
+	    String comment = "bug td19262 19291、14567&88888和939393，2231,33333 To fix td td19262_19291 by yangyancheng : 移植 from 7.0.7 to 7.0.8:调用包中函数时，结果出错"
+	            + " 原评审地址:http://10.0.5.169/r/6510  "
+    + " Review Link : http://192.168.101.27/r/8199/";
         String realAuthor = getRealAuthor(comment);
         String commentWithFormatBugId = getCommentWithFormatBugId(comment);
         String realComment = getRealComment(commentWithFormatBugId);
