@@ -180,7 +180,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 	
 	private boolean checkExcludeFolder(String folderName) {
 	    String excludeFolders = Config.instance.get("excludeFolders");
-	    if (excludeFolders != null) {
+	    if (excludeFolders != null && !"".equals(excludeFolders)) {
             String[] excludeFolder = excludeFolders.split(",");
             for (String folder : excludeFolder) {
                 if (folderName.equals(folder)) {
@@ -193,7 +193,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 	
 	private boolean checkExcludeFile(String fileName) {
         String excludeFiles = Config.instance.get("excludeFiles");
-        if (excludeFiles != null) {
+        if (excludeFiles != null && !"".equals(excludeFiles)) {
             String[] excludeFile = excludeFiles.split(",");
             for (String file : excludeFile) {
                 if (fileName.endsWith(file)) {
@@ -689,13 +689,17 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
      */
 	private static String getRealComment(String comment) {
 	    StringBuilder realComment = new StringBuilder(comment);
-	    String pattern = "(Review\\s+)*(Link\\s+:\\s+)*[hH][tT]{2}[pP]://(192.168.101.27)|(10.0.5.169)/([A-Za-z0-9-~\\/])+";
+	    String pattern = "(Review\\s+)*(Link\\s+:\\s+)*[hH][tT]{2}[pP]://((192.168.101.27)|(10.0.5.169))/r/\\d+/*";
         Matcher matcher = Pattern.compile(pattern,Pattern.CASE_INSENSITIVE).matcher(comment);
         String reviewLink = "";
+        int reviewLinkStartIndex = -1;
         while (matcher.find()) {
             reviewLink = matcher.group();
+            reviewLinkStartIndex = matcher.start();
         }
         if (!"".equals(reviewLink)) {
+            // reviewLinux 之前的部分
+            realComment = new StringBuilder(comment.substring(0, reviewLinkStartIndex));
             Matcher seqMatcher = Pattern.compile("\\d+").matcher(reviewLink);
             String seq = "";
             while(seqMatcher.find()) {// 找到需求编号
@@ -708,13 +712,14 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
                     JSONObject resObj = JSONObject.fromObject(res);
                     JSONObject reviewRequest = JSONObject.fromObject(resObj.getString("review_request"));
                     String description = reviewRequest.getString("description");
-                    // 换行并插入空行
+                    // 换行并插入空行 插入reviewboard上的描述信息
                     realComment.append("\n").append("\n").append(description);
                 } catch (IOException e) {
                     Log.log("connect review board failed " + e.getMessage());
                 }
             }
-           
+            // 插入reviewboard 连接
+            realComment.append("\n").append("\n").append(reviewLink);
         }
         
         // 将 reviewboard 连接替换为域名
@@ -823,7 +828,6 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 	
 	public static void main(String[] args) {
 	    String comment = "bug td19262 19291、14567&88888和939393，2231,33333 To fix td td19262_19291 by yangyancheng : 移植 from 7.0.7 to 7.0.8:调用包中函数时，结果出错"
-	            + " 原评审地址:http://10.0.5.169/r/6510  "
     + " Review Link : http://192.168.101.27/r/8199/";
         String realAuthor = getRealAuthor(comment);
         String commentWithFormatBugId = getCommentWithFormatBugId(comment);
